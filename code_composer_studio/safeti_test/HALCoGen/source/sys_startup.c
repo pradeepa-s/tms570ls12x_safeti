@@ -63,6 +63,8 @@
 #include "mibspi.h"
 
 /* USER CODE BEGIN (1) */
+#include "sl_api.h"
+#include "sl_priv.h"
 /* USER CODE END */
 
 
@@ -87,6 +89,7 @@ void afterSTC(void);
 /* Startup Routine */
 void _c_int00(void);
 /* USER CODE BEGIN (4) */
+SL_ResetReason 	resetReason;		/* Reset reason */
 /* USER CODE END */
 
 #pragma CODE_STATE(_c_int00, 32)
@@ -100,6 +103,8 @@ void _c_int00(void)
 {
     
 /* USER CODE BEGIN (5) */
+	volatile boolean 			retVal;             /* For function return values */
+	    SL_STC_Config 				stcSelfTestConfig;  /* STC Configuration */
 /* USER CODE END */
 
     /* Initialize Core Registers to avoid CCM Error */
