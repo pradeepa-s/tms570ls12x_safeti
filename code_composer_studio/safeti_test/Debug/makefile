@@ -177,7 +177,7 @@ all: safeti_test.out
 safeti_test.out: $(OBJS) $(CMD_SRCS) $(GEN_CMDS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: ARM Linker'
-	"C:/ti/ccsv6/tools/compiler/ti-cgt-arm_5.2.5/bin/armcl" -mv7R4 --code_state=32 --float_support=VFPv3D16 --abi=eabi -g --define=_VFP_SUPPORT_=1 --define=_TMS570LS12x_ --define=EXTERNAL_SP_INIT --diag_wrap=off --diag_warning=225 --display_error_number --enum_type=packed -z -m"safeti_test.map" --heap_size=0x800 --stack_size=0x800 -i"C:/ti/ccsv6/tools/compiler/ti-cgt-arm_5.2.5/lib" -i"C:/ti/ccsv6/tools/compiler/ti-cgt-arm_5.2.5/include" --reread_libs --display_error_number --diag_wrap=off --warn_sections --xml_link_info="safeti_test_linkInfo.xml" --rom_model --be32 -o "safeti_test.out" $(ORDERED_OBJS)
+	"C:/ti/ccsv6/tools/compiler/ti-cgt-arm_5.2.5/bin/armcl" -mv7R4 --code_state=32 --float_support=VFPv3D16 --abi=eabi -g --define=_VFP_SUPPORT_=1 --define=DEBUG_MODE --define=_TMS570LS12x_ --define=EXTERNAL_SP_INIT --diag_wrap=off --diag_warning=225 --display_error_number --enum_type=packed -z -m"safeti_test.map" --heap_size=0x800 --stack_size=0x800 -i"C:/ti/ccsv6/tools/compiler/ti-cgt-arm_5.2.5/lib" -i"C:/ti/ccsv6/tools/compiler/ti-cgt-arm_5.2.5/include" --reread_libs --display_error_number --diag_wrap=off --warn_sections --xml_link_info="safeti_test_linkInfo.xml" --rom_model --be32 -o "safeti_test.out" $(ORDERED_OBJS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 

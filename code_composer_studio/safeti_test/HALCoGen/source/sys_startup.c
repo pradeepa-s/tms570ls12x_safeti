@@ -49,6 +49,7 @@
 
 
 /* USER CODE BEGIN (0) */
+
 /* USER CODE END */
 
 
@@ -69,6 +70,7 @@
 
 
 /* USER CODE BEGIN (2) */
+#define SAFETI_INTEGRATE
 /* USER CODE END */
 
 
@@ -84,6 +86,7 @@ extern void exit(int _status);
 void afterSTC(void);
 
 /* USER CODE BEGIN (3) */
+void esmCallBackFunction (uint32 grp_channel, uint32 param1, uint32 param2, uint32 param3);
 /* USER CODE END */
 
 /* Startup Routine */
@@ -104,7 +107,9 @@ void _c_int00(void)
     
 /* USER CODE BEGIN (5) */
 	volatile boolean 			retVal;             /* For function return values */
-	    SL_STC_Config 				stcSelfTestConfig;  /* STC Configuration */
+	SL_STC_Config 				stcSelfTestConfig;  /* STC Configuration */
+
+	SL_Init_R4Registers();
 /* USER CODE END */
 
     /* Initialize Core Registers to avoid CCM Error */
@@ -117,6 +122,9 @@ void _c_int00(void)
     _coreInitStackPointer_();
 
 /* USER CODE BEGIN (7) */
+    resetReason = SL_Init_ResetReason();
+
+#ifndef SAFETI_INTEGRATE
 /* USER CODE END */
 
     /* Enable CPU Event Export */
@@ -125,12 +133,18 @@ void _c_int00(void)
      */
     _coreEnableEventBusExport_();
 /* USER CODE BEGIN (9) */
+#endif
+
+#ifndef SAFETI_INTEGRATE
 /* USER CODE END */
 
     /* Enable response to ECC errors indicated by CPU for accesses to flash */
     flashWREG->FEDACCTRL1 = 0x000A060AU;
 
 /* USER CODE BEGIN (10) */
+#endif
+
+#ifndef SAFETI_INTEGRATE
 /* USER CODE END */
 
     /* Enable CPU ECC checking for ATCM (flash accesses) */
@@ -138,6 +152,9 @@ void _c_int00(void)
 	
 
 /* USER CODE BEGIN (11) */
+#endif
+
+#ifndef SAFETI_INTEGRATE
 /* USER CODE END */
 
         /* Workaround for Errata CORTEXR4 66 */
@@ -155,16 +172,28 @@ void _c_int00(void)
     if ((SYS_EXCEPTION & POWERON_RESET) != 0U)
     {
 /* USER CODE BEGIN (12) */
+#else
+
+    if(RESET_TYPE_POWERON == resetReason){
 /* USER CODE END */
         
-        /* clear all reset status flags */
-        SYS_EXCEPTION = 0xFFFFU;
+    	/* clear all reset status flags */
+    	SYS_EXCEPTION = 0xFFFFU;
+
+
 
 /* USER CODE BEGIN (13) */
+        /* Workaround for Errata CORTEXR4 66 */
+		_errata_CORTEXR4_66_();
+
+		/* Workaround for Errata CORTEXR4 57 */
+		_errata_CORTEXR4_57_();
 /* USER CODE END */
+#endif
 /* USER CODE BEGIN (14) */
 /* USER CODE END */
 /* USER CODE BEGIN (15) */
+#ifndef SAFETI_INTEGRATE
 /* USER CODE END */
       /* continue with normal start-up sequence */
     }
@@ -175,6 +204,14 @@ void _c_int00(void)
         Add user code here to handle oscillator failure */
 
 /* USER CODE BEGIN (16) */
+#else
+    }
+    else if(RESET_TYPE_OSC_FAILURE == resetReason){
+
+    }
+#endif
+
+#ifndef SAFETI_INTEGRATE
 /* USER CODE END */
     }
     /*SAFETYMCUSW 139 S MR:13.7 <APPROVED> "Hardware status bit read check" */
@@ -189,8 +226,20 @@ void _c_int00(void)
         {
             /* Add user code here to handle watchdog violation. */ 
 /* USER CODE BEGIN (17) */
-/* USER CODE END */
+#else
+    else if(RESET_TYPE_WATCHDOG == resetReason){
 
+    	/* Reset caused due
+		 *  1) windowed watchdog violation - Add user code here to handle watchdog violation.
+		 *  2) ICEPICK Reset - After loading code via CCS / System Reset through CCS
+		 */
+		/* Check the WatchDog Status register */
+		if(WATCHDOG_STATUS != 0U)
+		{
+			/* Add user code here to handle watchdog violation. */
+
+/* USER CODE END */
+#endif
             /* Clear the Watchdog reset flag in Exception Status register */ 
             SYS_EXCEPTION = WATCHDOG_RESET;
         
@@ -202,6 +251,7 @@ void _c_int00(void)
             /* Clear the ICEPICK reset flag in Exception Status register */ 
             SYS_EXCEPTION = ICEPICK_RESET;
 /* USER CODE BEGIN (19) */
+#if 0
 /* USER CODE END */
         }
     }
@@ -213,6 +263,11 @@ void _c_int00(void)
         by toggling the "CPU RESET" bit of the CPU Reset Control Register. */
 
 /* USER CODE BEGIN (20) */
+#endif
+    	}
+    }
+    else if((RESET_TYPE_CPU == resetReason) && (RESET_TYPE_DEBUG != resetReason)){
+
 /* USER CODE END */
 
         /* clear all reset status flags */
@@ -242,7 +297,15 @@ void _c_int00(void)
                 esmREG->SR1[0U] = 0x08000000U;        
                 
                 /* Start CPU Self-Test */
-                cpuSelfTest(STC_INTERVAL, STC_MAX_TIMEOUT, TRUE);                            
+                //cpuSelfTest(STC_INTERVAL, STC_MAX_TIMEOUT, TRUE);
+
+                /* THIS WILL BE REPLACED BY HALCOGEN */
+                stcSelfTestConfig.stcClockDiv = 0;
+                stcSelfTestConfig.intervalCount = 1;
+                stcSelfTestConfig.restartInterval0 = TRUE;
+                stcSelfTestConfig.timeoutCounter = 0xFFFFFFFF;
+                _SL_HoldNClear_nError();
+                SL_SelfTest_STC(STC_RUN, TRUE, &stcSelfTestConfig);
             }
         }
         /* CPU reset caused by CPU self-test completion */
@@ -270,6 +333,7 @@ void _c_int00(void)
             /* Add custom routine here to handle the case where software causes CPU reset */
         }
 /* USER CODE BEGIN (21) */
+#ifndef SAFETI_INTEGRATE
 /* USER CODE END */
 
     }
@@ -280,6 +344,10 @@ void _c_int00(void)
         Add user code to handle software reset. */
 
 /* USER CODE BEGIN (22) */
+#else
+    }
+    else if(RESET_TYPE_SWRST == resetReason){
+
 /* USER CODE END */
     }
     else
@@ -314,6 +382,8 @@ void _c_int00(void)
     }
 
 /* USER CODE BEGIN (26) */
+#endif
+#ifndef SAFETI_INTEGRATE
 /* USER CODE END */
 
     /* Initialize System - Clock, Flash settings with Efuse self check */
@@ -385,12 +455,47 @@ void _c_int00(void)
     stcSelfCheck();
 
 /* USER CODE BEGIN (28) */
+#else
+    /* Initialize System - Clock, Flash settings with Efuse self check */
+    systemInit();
+
+#ifndef DEBUG_MODE
+    if(RESET_TYPE_DEBUG != resetReason){
+    	/* THIS WILL BE REPLACED BY HALCOGEN */
+		stcSelfTestConfig.stcClockDiv = 0;
+		stcSelfTestConfig.intervalCount = 1;
+		stcSelfTestConfig.restartInterval0 = TRUE;
+		stcSelfTestConfig.timeoutCounter = 0xFFFFFFFF;
+		_SL_HoldNClear_nError();
+		SL_SelfTest_STC(STC_COMPARE_SELFCHECK, TRUE, &stcSelfTestConfig);
+
+    }
+    else{
+    	afterSTC();
+    }
+#endif
+    afterSTC();
+#endif
 /* USER CODE END */
 }
 
 void afterSTC(void)
 {
 /* USER CODE BEGIN (29) */
+#ifdef SAFETI_INTEGRATE
+#ifndef DEBUG_MODE
+	SL_CCMR4F_FailInfo			failInfoCCMR4F;		/* CCMR4 Self Test fail info */
+#endif
+	volatile boolean 			retVal;             /* For function return values */
+	SL_PBIST_FailInfo           failInfoPBISTSRAM;  /* PBIST Failure information for TCM RAM */
+	SL_SelfTest_Result          failInfoFlash;      /* Flash Self test failure information */
+	SL_SelfTest_Result          failInfoTCMRAM;     /* TCM RAM Failure  information */
+	SL_PBIST_FailInfo           failInfoPBISTOthers;/* PBIST Failure information for non-TCM memories */
+	SL_PSCON_FailInfo           failInfoPSCON;      /* PSCON failure information */
+	SL_EFuse_Config             stConfigEFuse;      /* EFuse self test configuration */
+#endif
+
+#ifndef SAFETI_INTEGRATE
 /* USER CODE END */
 
     /* Make sure that CCM-R4F is working as expected.
@@ -401,14 +506,16 @@ void afterSTC(void)
     ccmSelfCheck();
 
 /* USER CODE BEGIN (30) */
+#endif
 /* USER CODE END */
 
 /* USER CODE BEGIN (31) */
+#ifndef SAFETI_INTEGRATE
 /* USER CODE END */
 
     /* Disable RAM ECC before doing PBIST for Main RAM */
     _coreDisableRamEcc_();
-    
+
     /* Run PBIST on CPU RAM.
      * The PBIST controller needs to be configured separately for single-port and dual-port SRAMs.
      * The CPU RAM is a single-port memory. The actual "RAM Group" for all on-chip SRAMs is defined in the
@@ -423,13 +530,13 @@ void afterSTC(void)
     /* Wait for PBIST for CPU RAM to be completed */
     /*SAFETYMCUSW 28 D MR:NA <APPROVED> "Hardware status bit read check" */
     while(pbistIsTestCompleted() != TRUE)
-    { 
-    }/* Wait */                 
-    
+    {
+    }/* Wait */
+
 
 /* USER CODE BEGIN (33) */
 /* USER CODE END */
-    
+
     /* Check if CPU RAM passed the self-test */
     if( pbistIsTestPassed() != TRUE)
     {
@@ -439,9 +546,9 @@ void afterSTC(void)
          */
 /* USER CODE BEGIN (34) */
 /* USER CODE END */
-         
+
         pbistFail();
-        
+
 /* USER CODE BEGIN (35) */
 /* USER CODE END */
     }
@@ -452,8 +559,50 @@ void afterSTC(void)
     /* Disable PBIST clocks and disable memory self-test mode */
     pbistStop();
 
-    
+
 /* USER CODE BEGIN (37) */
+#else
+    /* Execute PBIST tests on required peripheral SRAMs */
+    _SL_HoldNClear_nError();
+    retVal = SL_SelfTest_PBIST(PBIST_EXECUTE, PBIST_RAMGROUP_01_PBIST_ROM, PBISTALGO_TRIPLE_READ_FAST_READ);
+
+    while(TRUE != SL_SelfTest_WaitCompletion_PBIST());
+
+    SL_SelfTest_Status_PBIST(&failInfoPBISTSRAM);
+	if (failInfoPBISTSRAM.stResult != ST_PASS)
+	{
+		while(1);
+	}
+
+	/* Run a diagnostic check on the memory self-test controller.
+	 * This function chooses a RAM test algorithm and runs it on an on-chip ROM.
+	 * The memory self-test is expected to fail. The function ensures that the PBIST controller
+	 * is capable of detecting and indicating a memory self-test failure.
+	 */
+
+	/* Run PBIST on CPU RAM.
+	 * The PBIST controller needs to be configured separately for single-port and dual-port SRAMs.
+	 * The CPU RAM is a single-port memory. The actual "RAM Group" for all on-chip SRAMs is defined in the
+	 * device datasheet.
+	 */
+	retVal = SL_SelfTest_PBIST(	PBIST_EXECUTE,                                          /* Execute PBIST test */
+								(PBIST_RAMGROUP_06_ESRAM1 | PBIST_RAMGROUP_21_ESRAM5 |  /* On all TCM RAMs */
+								PBIST_RAMGROUP_22_ESRAM6),
+								PBISTALGO_MARCH13N_RED_1PORT);
+	while (TRUE != SL_SelfTest_WaitCompletion_PBIST());
+
+	/* Get SRAM PBIST Status */
+	SL_SelfTest_Status_PBIST(&failInfoPBISTSRAM);
+	if (failInfoPBISTSRAM.stResult != ST_PASS)
+	{
+		while(1);
+	}
+
+	/* Disable PBIST clocks and disable memory self-test mode */
+	SL_SelfTest_PBIST_StopExec();
+#endif
+
+#ifndef SAFETI_INTEGRATE
 /* USER CODE END */
 
 
@@ -467,7 +616,7 @@ void afterSTC(void)
 
 /* USER CODE BEGIN (38) */
 /* USER CODE END */
-    
+
     /* Enable ECC checking for TCRAM accesses.
      * This function enables the CPU's ECC logic for accesses to B0TCM and B1TCM.
      */
@@ -481,7 +630,7 @@ void afterSTC(void)
        PBIST test performed only on the user selected memories in HALCoGen's GUI SAFETY INIT tab.
      */
     pbistRun(  (uint32)0x00000000U    /* EMAC RAM */
-             | (uint32)0x00000000U    /* USB RAM */  
+             | (uint32)0x00000000U    /* USB RAM */
              | (uint32)0x00000800U    /* DMA RAM */
              | (uint32)0x00000200U    /* VIM RAM */
              | (uint32)0x00000040U    /* MIBSPI1 RAM */
@@ -501,6 +650,30 @@ void afterSTC(void)
              ,(uint32) PBIST_March13N_DP);
 
 /* USER CODE BEGIN (40) */
+#else
+    /* Initialize CPU RAM.
+	 * This function uses the system module's hardware for auto-initialization of memories and their
+	 * associated protection schemes. The CPU RAM is initialized by setting bit 0 of the MSIENA register.
+	 * Hence the value 0x1 passed to the function.
+	 * This function will initialize the entire CPU RAM and the corresponding ECC locations.
+	 */
+    SL_Init_Memory(RAMTYPE_RAM);
+	SL_Init_ECCFlash(10, FLASHECC_DEFAULT); /* Enable Flash ECC */
+
+	SL_Init_ECCTCMRAM(10, TRUE);            /* Enable TCM RAM ECC */
+
+	/* Execute PBIST tests on required peripheral SRAMs */
+	retVal = SL_SelfTest_PBIST( PBIST_EXECUTE,
+								(PBIST_RAMGROUP_07_MIBSPI1  |
+								PBIST_RAMGROUP_08_MIBSPI3   |
+								PBIST_RAMGROUP_09_MIBSPI5   |
+								PBIST_RAMGROUP_10_VIM       |
+								PBIST_RAMGROUP_11_MIBADC1   |
+								PBIST_RAMGROUP_18_MIBADC2),
+								PBISTALGO_MARCH13N_RED_2PORT);
+#endif
+
+#ifndef SAFETI_INTEGRATE
 /* USER CODE END */
 
     /* Test the CPU ECC mechanism for RAM accesses.
@@ -513,6 +686,20 @@ void afterSTC(void)
     checkRAMECC();
 
 /* USER CODE BEGIN (41) */
+#else
+    /* Run 1Bit ECC test on TCM RAM */
+	retVal = SL_SelfTest_SRAM(SRAM_ECC_ERROR_FORCING_1BIT, TRUE, &failInfoTCMRAM);
+	if(retVal == FALSE) while(1);
+
+	/* Run 1Bit ECC error profiling test on TCM RAM */
+   retVal = SL_SelfTest_SRAM(SRAM_ECC_ERROR_PROFILING, TRUE, &failInfoTCMRAM);
+   if(retVal == FALSE) while(1);
+
+   retVal = SL_SelfTest_SRAM(SRAM_ECC_ERROR_FORCING_2BIT, TRUE, &failInfoTCMRAM);
+	if(retVal == FALSE) while(1);
+#endif
+
+#ifndef SAFETI_INTEGRATE
 /* USER CODE END */
 
     /* Test the CPU ECC mechanism for Flash accesses.
@@ -535,9 +722,9 @@ void afterSTC(void)
     /* Wait for PBIST for CPU RAM to be completed */
     /*SAFETYMCUSW 28 D MR:NA <APPROVED> "Hardware status bit read check" */
     while(pbistIsTestCompleted() != TRUE)
-    { 
-    }/* Wait */                 
-    
+    {
+    }/* Wait */
+
 
 /* USER CODE BEGIN (44) */
 /* USER CODE END */
@@ -555,9 +742,9 @@ void afterSTC(void)
          */
 /* USER CODE BEGIN (46) */
 /* USER CODE END */
-         
+
         pbistFail();
-        
+
 /* USER CODE BEGIN (47) */
 /* USER CODE END */
     }
@@ -567,31 +754,77 @@ void afterSTC(void)
 
     /* Disable PBIST clocks and disable memory self-test mode */
     pbistStop();
-    
+
 /* USER CODE BEGIN (55) */
+#else
+    retVal = SL_SelfTest_FEE(FEE_ECC_DATA_CORR_MODE, TRUE, &failInfoFlash);
+	if(retVal == FALSE) while(1);
+
+	/* Run 1 bit selftest */
+	retVal = SL_SelfTest_FEE(FEE_ECC_TEST_MODE_1BIT, TRUE, &failInfoFlash);
+	if(retVal == FALSE) while(1);
+
+	/* Run 2 bit selftest */
+	retVal = SL_SelfTest_FEE(FEE_ECC_TEST_MODE_2BIT, TRUE, &failInfoFlash);
+	if(retVal == FALSE) while(1);
+
+	/* Run Diagmode 2 */
+	retVal = SL_SelfTest_FEE(FEE_ECC_SYN_REPORT_MODE, TRUE, &failInfoFlash);
+	if(retVal == FALSE) while(1);
+
+	/* Run Diagmode 3 */
+	retVal = SL_SelfTest_FEE(FEE_ECC_MALFUNCTION_MODE1, TRUE, &failInfoFlash);
+	if(retVal == FALSE) while(1);
+
+	/* Run Diagmode 4 */
+	retVal = SL_SelfTest_FEE(FEE_ECC_MALFUNCTION_MODE2, TRUE, &failInfoFlash);
+	if(retVal == FALSE) while(1);
+
+	/* Run 1Bit ECC test on Flash */
+	retVal = SL_SelfTest_Flash(FLASH_ECC_TEST_MODE_1BIT, TRUE, &failInfoFlash);
+	if(retVal == FALSE) while(1);
+
+	/* Run 2Bit ECC test on Flash */
+   retVal = SL_SelfTest_Flash(FLASH_ECC_TEST_MODE_2BIT, TRUE, &failInfoFlash);
+   if(retVal == FALSE) while(1);
+
+	while (TRUE != SL_SelfTest_WaitCompletion_PBIST());
+	SL_SelfTest_Status_PBIST(&failInfoPBISTOthers);
+
+	/* Check the PBIST status and if there is a failure then wait*/
+	if (failInfoPBISTOthers.stResult != ST_PASS)
+	{
+		while(1);
+	}
+
+	/* Disable PBIST clocks and disable memory self-test mode */
+	SL_SelfTest_PBIST_StopExec();
+#endif
+
+#ifndef SAFETI_INTEGRATE
 /* USER CODE END */
 
     /* Release the MibSPI1 modules from local reset.
      * This will cause the MibSPI1 RAMs to get initialized along with the parity memory.
      */
      mibspiREG1->GCR0 = 0x1U;
-     
+
     /* Release the MibSPI3 modules from local reset.
      * This will cause the MibSPI3 RAMs to get initialized along with the parity memory.
      */
     mibspiREG3->GCR0 = 0x1U;
-    
+
     /* Release the MibSPI5 modules from local reset.
      * This will cause the MibSPI5 RAMs to get initialized along with the parity memory.
      */
     mibspiREG5->GCR0 = 0x1U;
-    
+
 /* USER CODE BEGIN (56) */
 /* USER CODE END */
 
     /* Enable parity on selected RAMs */
     enableParity();
-    
+
     /* Initialize all on-chip SRAMs except for MibSPIx RAMs
      * The MibSPIx modules have their own auto-initialization mechanism which is triggered
      * as soon as the modules are brought out of local reset.
@@ -616,7 +849,7 @@ void afterSTC(void)
 
     /* Disable parity */
     disableParity();
-    
+
     /* Test the parity protection mechanism for peripheral RAMs
        NOTE : Please Refer DEVICE DATASHEET for the list of Supported Memories with parity.
                  Parity Self check is perfomed only on the user selected memories in HALCoGen's GUI SAFETY INIT tab.
@@ -624,54 +857,54 @@ void afterSTC(void)
 
 /* USER CODE BEGIN (57) */
 /* USER CODE END */
-     
+
     het1ParityCheck();
-    
+
 /* USER CODE BEGIN (58) */
 /* USER CODE END */
 
     htu1ParityCheck();
-    
+
 /* USER CODE BEGIN (59) */
 /* USER CODE END */
 
     het2ParityCheck();
-    
+
 /* USER CODE BEGIN (60) */
 /* USER CODE END */
 
     htu2ParityCheck();
-    
+
 /* USER CODE BEGIN (61) */
 /* USER CODE END */
 
     adc1ParityCheck();
-    
+
 /* USER CODE BEGIN (62) */
 /* USER CODE END */
 
     adc2ParityCheck();
-    
+
 /* USER CODE BEGIN (63) */
 /* USER CODE END */
 
     can1ParityCheck();
-    
+
 /* USER CODE BEGIN (64) */
 /* USER CODE END */
 
     can2ParityCheck();
-    
+
 /* USER CODE BEGIN (65) */
 /* USER CODE END */
 
     can3ParityCheck();
-    
+
 /* USER CODE BEGIN (66) */
 /* USER CODE END */
 
     vimParityCheck();
-    
+
 /* USER CODE BEGIN (67) */
 /* USER CODE END */
 
@@ -683,48 +916,107 @@ void afterSTC(void)
 
 /*SAFETYMCUSW 28 D MR:NA <APPROVED> "Hardware status bit read check" */
     while ((mibspiREG1->FLG & 0x01000000U) == 0x01000000U)
-    { 
-    }/* Wait */                 
+    {
+    }/* Wait */
     /* wait for MibSPI1 RAM to complete initialization */
 /*SAFETYMCUSW 28 D MR:NA <APPROVED> "Hardware status bit read check" */
     while ((mibspiREG3->FLG & 0x01000000U) == 0x01000000U)
-    { 
-    }/* Wait */                 
-    /* wait for MibSPI3 RAM to complete initialization */ 
+    {
+    }/* Wait */
+    /* wait for MibSPI3 RAM to complete initialization */
 /*SAFETYMCUSW 28 D MR:NA <APPROVED> "Hardware status bit read check" */
     while ((mibspiREG5->FLG & 0x01000000U) == 0x01000000U)
-    { 
-    }/* Wait */                 
+    {
+    }/* Wait */
     /* wait for MibSPI5 RAM to complete initialization */
 
 /* USER CODE BEGIN (69) */
 /* USER CODE END */
 
     mibspi1ParityCheck();
-    
+
 /* USER CODE BEGIN (70) */
 /* USER CODE END */
 
     mibspi3ParityCheck();
-    
+
 /* USER CODE BEGIN (71) */
 /* USER CODE END */
-    
+
     mibspi5ParityCheck();
-    
+
 
 /* USER CODE BEGIN (72) */
+#endif
 /* USER CODE END */
-    
+
     /* Enable IRQ offset via Vic controller */
     _coreEnableIrqVicOffset_();
-    
+
 
 /* USER CODE BEGIN (73) */
+#ifdef SAFETI_INTEGRATE
+    SL_ESM_Init(esmCallBackFunction);
+
+	/* Run PSCON self tests in sync mode */
+	retVal = SL_SelfTest_PSCON(PSCON_SELF_TEST, TRUE, &failInfoPSCON);
+	if(retVal == FALSE) while(1);
+
+	retVal = SL_SelfTest_PSCON(PSCON_ERROR_FORCING, TRUE, &failInfoPSCON);
+	if(retVal == FALSE) while(1);
+
+	retVal = SL_SelfTest_PSCON(PSCON_SELF_TEST_ERROR_FORCING, TRUE, &failInfoPSCON);
+	if(retVal == FALSE) while(1);
+
+	retVal = SL_SelfTest_PSCON(PSCON_PMA_TEST, TRUE, &failInfoPSCON);
+	if (FALSE != retVal)
+	{ /* Must fail, since PMA tests cannot be run in privilege modes */
+		while(1);
+	}
+
+
+	/* Run EFuse self tests */
+	stConfigEFuse.numPatterns      = 600u;
+	stConfigEFuse.seedSignature    = 0x5362F97Fu;
+	stConfigEFuse.failInfo.stResult= ST_FAIL;
+	stConfigEFuse.failInfo.failInfo= EFUSE_ERROR_NONE;
+	retVal = SL_SelfTest_EFuse(EFUSE_SELF_TEST_STUCK_AT_ZERO, TRUE, &stConfigEFuse);
+	if(retVal == FALSE) while(1);
+
+	retVal = SL_SelfTest_EFuse(EFUSE_SELF_TEST_ECC, TRUE, &stConfigEFuse);
+	while (TRUE != SL_SelfTest_Status_EFuse(&stConfigEFuse.failInfo));
+	if(retVal == FALSE) while(1);
+
+#ifndef DEBUG_MODE
+
+	// Reset variable gets replaced when RAM self tests are in progress
+	resetReason = SL_Init_ResetReason();
+
+	/*This block can be enabled when not running the code with debugger.The ccmr4f tests do not run with debugger connected*/
+	/* With debugger connected, CCM is disabled so do not run when debugger is connected */
+	if (RESET_TYPE_DEBUG != resetReason) {
+		/* Try CCMR4F Fault Injection */
+		retVal = SL_SelfTest_CCMR4F(CCMR4F_SELF_TEST, TRUE, &failInfoCCMR4F);
+		if(retVal == FALSE) while(1);
+
+		retVal = SL_SelfTest_CCMR4F(CCMR4F_ERROR_FORCING_TEST, TRUE, &failInfoCCMR4F);
+		if(retVal == FALSE) while(1);
+
+		retVal = SL_SelfTest_CCMR4F(CCMR4F_SELF_TEST_ERROR_FORCING, TRUE, &failInfoCCMR4F);
+		if(retVal == FALSE) while(1);
+	}
+#endif
+	/* Run RAD Self tests on TCMRAM */
+	retVal = SL_SelfTest_SRAM(SRAM_RADECODE_DIAGNOSTICS, TRUE, &failInfoTCMRAM);;
+	if(retVal == FALSE) while(1);
+
+	retVal = SL_SelfTest_SRAM(SRAM_PAR_ADDR_CTRL_SELF_TEST, TRUE, &failInfoTCMRAM);;
+	if(retVal == FALSE) while(1);
+#endif
 /* USER CODE END */
 
     /* Initialize VIM table */
-    vimInit();    
+    vimInit();
 
 /* USER CODE BEGIN (74) */
 /* USER CODE END */
@@ -736,7 +1028,7 @@ void afterSTC(void)
     __TI_auto_init();
 /* USER CODE BEGIN (75) */
 /* USER CODE END */
-    
+
     /* call the application */
 /*SAFETYMCUSW 296 S MR:8.6 <APPROVED> "Startup code(library functions at block scope)" */
 /*SAFETYMCUSW 326 S MR:8.2 <APPROVED> "Startup code(Declaration for main in library)" */
@@ -753,4 +1045,10 @@ void afterSTC(void)
 }
 
 /* USER CODE BEGIN (78) */
+void esmCallBackFunction (uint32 grp_channel, uint32 param1, uint32 param2, uint32 param3)
+{
+
+}
 /* USER CODE END */
+
+

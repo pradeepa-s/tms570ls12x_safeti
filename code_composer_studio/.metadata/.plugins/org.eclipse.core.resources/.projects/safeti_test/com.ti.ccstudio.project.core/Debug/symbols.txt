@@ -1,6 +1,6 @@
 #define __unsigned_chars__ 1	/* Predefined */
-#define __DATE__ "Feb 13 2016"	/* Predefined */
-#define __TIME__ "07:43:34"	/* Predefined */
+#define __DATE__ "Feb 22 2016"	/* Predefined */
+#define __TIME__ "18:47:43"	/* Predefined */
 #define __STDC__ 1	/* Predefined */
 #define __STDC_VERSION__ 199409L	/* Predefined */
 #define __edg_front_end__ 1	/* Predefined */
@@ -35,5 +35,6 @@
 #define __TI_STRICT_FP_MODE__ 1	/* Predefined */
 #define _OPTIMIZE_FOR_SPACE 1
 #define _VFP_SUPPORT_ 1
+#define DEBUG_MODE 1
 #define _TMS570LS12x_ 1
 #define EXTERNAL_SP_INIT 1
